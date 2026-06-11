@@ -218,6 +218,8 @@ _NEW_RETRYABLE_SNIPPETS = [
     # Generic "stream ... ended" fallback — covers wording we don't yet know.
     "stream connection ended unexpectedly",
     "stream ended early",
+    # Anthropic upstream_idle_timeout — API got no data for 60s.
+    "upstream_idle_timeout",
 ]
 
 
@@ -243,6 +245,24 @@ class TestExpandedRetryClassifier:
         assert not should_retry_streaming_exception(
             UnexpectedModelBehavior("stream opened but no body")
         )  # matches 'stream' but not 'ended'
+
+    @pytest.mark.asyncio
+    async def test_retries_on_upstream_idle_timeout(self):
+        """upstream_idle_timeout is a transient Anthropic error (no data for 60s)."""
+        error = _make_openai_api_error(
+            "upstream_idle_timeout (rid=eb6eef7f): no data for 60s",
+            body={
+                "message": "upstream_idle_timeout (rid=eb6eef7f): no data for 60s",
+                "type": "api_error",
+            },
+        )
+        factory = AsyncMock(side_effect=[error, "recovered"])
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            result = await _run_with_streaming_retry(factory)
+
+        assert result == "recovered"
+        assert factory.await_count == 2
 
     def test_generic_stream_ended_fallback(self):
         # Different phrasings, all transient.

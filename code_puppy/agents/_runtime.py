@@ -103,6 +103,7 @@ _RETRYABLE_SNIPPETS = (
     "server had an error processing your request",
     "retry your request",
     "internal server error",
+    "upstream_idle_timeout",
 )
 
 _RETRYABLE_EXCEPTIONS: tuple = (
